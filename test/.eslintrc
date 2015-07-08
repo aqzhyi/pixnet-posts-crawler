@@ -1,0 +1,17 @@
+{
+  "ecmaFeatures": {
+    "modules": true,
+    "jsx": false
+  },
+  "rules": {
+    // chai.js (ex: to.be.true)
+    "no-unused-expressions": 0
+  },
+  "env": {
+    "browser": false,
+    "es6": true,
+    "mocha": true,
+    "node": true,
+    "phantomjs": false
+  }
+}

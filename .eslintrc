@@ -1,0 +1,23 @@
+{
+  "ecmaFeatures": {
+    "modules": true,
+    "jsx": false
+  },
+  "rules": {
+    // since ASI
+    "semi": [2, "never"],
+    "semi-spacing": [2, {"before": false, "after": false}],
+    //
+    "comma-dangle": 0,
+    "curly": [2, "multi-line"],
+    "no-use-before-define": [2, "nofunc"],
+    "quotes": [2, "single"]
+  },
+  "env": {
+    "browser": false,
+    "es6": true,
+    "mocha": false,
+    "node": true,
+    "phantomjs": false
+  }
+}
