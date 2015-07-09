@@ -105,10 +105,14 @@
 
     var maxPageDigged = crawlPages(URL).then(function (maxPage) {
 
+      var pageRange = 0;
+
       logFindAll('部落格總共有 ' + maxPage + ' 頁，設定最多抓 ' + MAX_PAGE + ' 頁。');
 
       if (maxPage >= MAX_PAGE) {
-        var pageRange = MAX_PAGE;
+        pageRange = MAX_PAGE;
+      } else {
+        pageRange = maxPage;
       }
 
       logFindAll('現在開始抓取，到最多第 ' + pageRange + ' 頁');
