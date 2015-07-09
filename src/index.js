@@ -1,6 +1,7 @@
 import $ from 'cheerio'
 import _ from 'lodash'
 import addressDigger from 'html-taiwan-address-digger'
+import async from 'async'
 import debug from 'debug'
 import he from 'he'
 import imgDigger from 'html-img-digger'
@@ -68,14 +69,82 @@ function findAll(opts = {}) {
   }
 
   const URL = opts.url
+  const MAX_PAGE = opts.maxPage || 1
 
-  logFindAll(`現在抓取目標: ${URL}`)
+  let maxPageDigged = crawlPages(URL).then((maxPage) => {
+
+    logFindAll(`部落格總共有 ${maxPage} 頁，設定最多抓 ${MAX_PAGE} 頁。`)
+
+    if (maxPage >= MAX_PAGE) {
+      var pageRange = MAX_PAGE
+    }
+
+    logFindAll(`現在開始抓取，到最多第 ${pageRange} 頁`)
+
+    return pageRange
+  })
+
+  .then((pageRange) => {
+
+    // 同時最多 N 條線
+    const THREADS_AT_SAME_TIME = 3
+
+    // 總共 [1,2,3,4,...N] 頁
+    let pageRanges = _.range(1, pageRange + 1)
+
+    logFindAll(`同時開了 ${THREADS_AT_SAME_TIME} 條連線，發動請求！`)
+
+    // send requests
+    return new Promise((ok, bad) => {
+
+      let list = []
+
+      async.eachLimit(pageRanges, THREADS_AT_SAME_TIME, (page, done) => {
+
+        let blogUrl = `${URL}/${page}`
+        let crawled = crawlList(blogUrl)
+
+        // concat requested lists
+        crawled
+        .then((result) => {
+          list = list.concat(result)
+          done()
+        }, done)
+
+      }, (err) => {
+        if (err) {
+          return bad(err)
+        }
+        else {
+          return ok(list)
+        }
+      })
+    })
+  })
+
+  return maxPageDigged
+}
+
+function crawlPages(url) {
+
   return request({
     method: 'GET',
-    url: URL,
+    url: url,
     json: false,
   })
-  .then((bodyString) => $('<pixnet>').append(bodyString))
+  .then((bodyString) => $(bodyString))
+  .then(($body) => maxPageDig($body))
+}
+
+function crawlList(url) {
+
+  logFindAll(`現在抓取清單，目標: ${url}`)
+  return request({
+    method: 'GET',
+    url: url,
+    json: false,
+  })
+  .then((bodyString) => $(bodyString))
   .then(($body) => {
     let $posts = $body.find('.article')
 
@@ -88,17 +157,35 @@ function findAll(opts = {}) {
       let title = titleDig($element)
 
       let $url = $element.find('.title')
-      let url = $url.find('a').attr('href').trim()
+      let postUrl = $url.find('a').attr('href').trim()
 
       return {
         datetime,
         title,
-        url,
+        url: postUrl,
       }
     })
 
     return posts
   })
+}
+
+function maxPageDig($element) {
+
+  let alinks = $element.find('.page a')
+
+  let pages = _.map(alinks, (aElement) => {
+    let pageNum = Number($(aElement).text())
+    if (Number.isNaN(pageNum)) {
+      return 0
+    }
+
+    return pageNum
+  })
+
+  let maxPage = _.max(pages)
+
+  return maxPage
 }
 
 function datetimeDig($element) {

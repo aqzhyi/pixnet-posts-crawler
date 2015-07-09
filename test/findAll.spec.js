@@ -1,6 +1,6 @@
+import _ from 'lodash'
 import {expect} from 'chai'
 import crawler from '../dist/index'
-import _ from 'lodash'
 
 describe('findAll()', function() {
 
@@ -23,5 +23,24 @@ describe('findAll()', function() {
         expect(new Date(item.datetime).toString()).to.not.match(/invalid/i)
       })
     })
+  })
+
+  it('maxPage as argument', () => {
+
+    // maxPage tests
+    let promises = [1, 2, 7]
+
+    return Promise.all(promises.map((maxPage) => {
+
+      return crawler
+      .findAll({ url: 'http://money9992.pixnet.net/blog', maxPage: maxPage })
+      .then((result) => {
+
+        expect(result).to.be.an('array')
+        expect(result).length.to.not.above(10 * maxPage)
+        expect(result).length.to.above(10 * maxPage - 1)
+      })
+    }))
+
   })
 })
