@@ -83,19 +83,12 @@ function findAll(opts = {}) {
     let posts = _.map($posts, (articleElement) => {
       let $element = $(articleElement)
 
-      let $pub = $element.find('.publish')
-      let month = $pub.find('.month').text().trim() // Jul
-      let date = $pub.find('.date').text().trim() // 07
-      let year = $pub.find('.year').text().trim() // 2015
-      let time = $pub.find('.time').text().trim() // 13:12
+      let datetime = datetimeDig($element)
 
-      let datetime = new Date(`${month} ${date} ${year} ${time}`)
-      datetime = (datetime.toString().match(/invalid/i)) ? null : datetime.toISOString()
+      let title = titleDig($element)
 
-      let $title = $element.find('.title')
-      let title = $title.find('a').text().trim()
-
-      let url = $title.find('a').attr('href').trim()
+      let $url = $element.find('.title')
+      let url = $url.find('a').attr('href').trim()
 
       return {
         datetime,

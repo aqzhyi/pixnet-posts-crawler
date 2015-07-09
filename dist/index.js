@@ -114,19 +114,12 @@
       var posts = _2['default'].map($posts, function (articleElement) {
         var $element = (0, _$['default'])(articleElement);
 
-        var $pub = $element.find('.publish');
-        var month = $pub.find('.month').text().trim(); // Jul
-        var date = $pub.find('.date').text().trim(); // 07
-        var year = $pub.find('.year').text().trim(); // 2015
-        var time = $pub.find('.time').text().trim(); // 13:12
+        var datetime = datetimeDig($element);
 
-        var datetime = new Date(month + ' ' + date + ' ' + year + ' ' + time);
-        datetime = datetime.toString().match(/invalid/i) ? null : datetime.toISOString();
+        var title = titleDig($element);
 
-        var $title = $element.find('.title');
-        var title = $title.find('a').text().trim();
-
-        var url = $title.find('a').attr('href').trim();
+        var $url = $element.find('.title');
+        var url = $url.find('a').attr('href').trim();
 
         return {
           datetime: datetime,
