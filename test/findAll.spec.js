@@ -1,46 +1,50 @@
 import _ from 'lodash'
 import {expect} from 'chai'
 import crawler from '../src/index'
+import isUrl from 'is-url'
+import isISOString from 'isostring'
 
 describe('findAll()', function() {
 
   this.timeout(10000)
 
-  it('Basic usage', () => {
+  it('fetchAll: false', async () => {
 
-    return crawler
-    .findAll({ url: 'http://money9992.pixnet.net/blog' })
-    .then((result) => {
-
-      expect(result).to.be.an('array')
-
-      _.each(result, (item) => {
-
-        expect(item).to.include.keys('url', 'title', 'datetime')
-        expect(item.url).to.be.a('string').to.match(/https?:\/\//i)
-        expect(item.title).to.be.a('string')
-        expect(item.datetime).to.be.a('string')
-        expect(new Date(item.datetime).toString()).to.not.match(/invalid/i)
-      })
+    let articles = await crawler.findAll({
+      url: 'http://money9992.pixnet.net/blog',
+      fetchAll: false,
     })
+
+    expect(articles).to.be.an('array')
+    expect(articles).to.have.length.below(21)
+    _.forEach(articles, (item) => expect(item).to.be.an('object'))
   })
 
-  it('maxPage as argument', () => {
+  it('fetchAll: true', async () => {
 
-    // maxPage tests
-    let promises = [1, 2, 7]
+    let articles = await crawler.findAll({
+      url: 'http://money9992.pixnet.net/blog',
+      fetchAll: true,
+    })
 
-    return Promise.all(promises.map((maxPage) => {
+    expect(articles).to.be.an('array')
+    expect(articles).to.have.length.above(20)
+    _.forEach(articles, (item) => expect(item).to.be.an('object'))
+  })
 
-      return crawler
-      .findAll({ url: 'http://money9992.pixnet.net/blog', maxPage: maxPage })
-      .then((result) => {
+  it('Basic properties', async () => {
 
-        expect(result).to.be.an('array')
-        expect(result).length.to.not.above(10 * maxPage)
-        expect(result).length.to.above(10 * maxPage - 1)
-      })
-    }))
+    let articles = await crawler.findAll({
+      url: 'http://money9992.pixnet.net/blog',
+      fetchAll: false,
+    })
 
+    _.each(articles, (item) => {
+
+      expect(isISOString(item.published)).to.equal(true, '必須要有 published')
+      expect(isUrl(item.url)).to.equal(true, '必須要有 url')
+      expect(item.title).to.be.a('string', '必須要有 title')
+      expect(item).to.include.keys('url', 'title', 'datetime')
+    })
   })
 })

@@ -17,7 +17,7 @@
   "scripts": {
     "dev": "gulp babel && gulp watch",
     "build": "gulp babel",
-    "test": "mocha --check-leaks --compilers js:babel-core/register"
+    "test": "NODE_ENV=test mocha --check-leaks --compilers js:babel-core/register"
   },
   "author": "Pleasurazy <pleasurazy@gmail.com>",
   "license": "MIT",
@@ -41,6 +41,8 @@
     "he": "^0.5.0",
     "html-img-digger": "^0.1.0",
     "html-taiwan-address-digger": "^0.1.1",
+    "is-url": "^1.2.1",
+    "isostring": "0.0.1",
     "lodash": "^3.10.0",
     "request-promise": "^0.4.2"
   }
