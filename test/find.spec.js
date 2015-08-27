@@ -1,5 +1,5 @@
 import {expect} from 'chai'
-import crawler from '../dist/index'
+import crawler from '../src/index'
 import _ from 'lodash'
 
 describe('find()', function() {

@@ -1,46 +1,23 @@
-import gulp from 'gulp'
-import babel from 'gulp-babel'
-import plumberNotifier from 'gulp-plumber-notifier'
-import runSequence from 'run-sequence'
 import del from 'del'
+import gulp from 'gulp'
+import Run from 'run-sequence'
+import tasks from 'easy-gulp-task'
 
-const PATH = {
-  src: {
-    js: './src/**/*.js'
-  },
-  dist: {
-    js: './dist'
-  }
-}
+let run = Run.use(gulp)
 
-let runseq = runSequence.use(gulp)
-
-gulp.task('clean', cleanTask)
-gulp.task('babel', babelTask)
+gulp.task('babel', tasks.babel({ babel: { optional: ['runtime'] } }))
 gulp.task('build', buildTask)
-gulp.task('watch', watchTask)
+gulp.task('clean', cleanTask)
+gulp.task('watch', tasks.watch({ babel: () => run('babel') }))
 
 function cleanTask(done) {
-  del([
-    PATH.dist.js,
-  ], done)
-}
-
-function babelTask() {
-  return gulp.src(PATH.src.js)
-  .pipe(plumberNotifier())
-  .pipe(babel({ modules: 'umd' }))
-  .pipe(gulp.dest(PATH.dist.js))
+  del('./dist', done)
 }
 
 function buildTask(done) {
-  runseq(
+  run(
     'clean',
     ['babel'],
     done
   )
-}
-
-function watchTask() {
-  gulp.watch(PATH.src.js, ['babel'])
 }
