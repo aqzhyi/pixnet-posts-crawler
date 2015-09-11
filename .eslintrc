@@ -12,7 +12,9 @@
     "comma-dangle": 0,
     "curly": [2, "multi-line"],
     "no-use-before-define": [2, "nofunc"],
-    "quotes": [2, "single"]
+    "quotes": [2, "single"],
+
+    "no-undef": 2
   },
   "env": {
     "browser": false,
