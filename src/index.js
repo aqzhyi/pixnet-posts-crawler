@@ -1,135 +1,113 @@
 import $ from 'cheerio'
 import _ from 'lodash'
 import addressDigger from 'html-taiwan-address-digger'
-import async from 'async'
+import async from 'async-q'
 import debug from 'debug'
 import he from 'he'
 import imgDigger from 'html-img-digger'
 import request from 'request-promise'
+import isISOString from 'isostring'
 
-let logFind = debug(`pixnet-posts-crawler:find`)
-let logFindAll = debug(`pixnet-posts-crawler:findAll`)
+let logRoot = debug('pixnet-posts-crawler')
+const NODE_ENV = process.env.NODE_ENV || 'development'
 
-function find(opts = {}) {
+async function find(opts = {}) {
+
+  let log = debug(`${logRoot.namespace}:find`)
+
   if (!opts.url || typeof opts.url !== 'string') {
     return Promise.reject('Need url. API Documents => crawler.find({ url:String })')
   }
 
-  logFind(`來抓取 ${opts.url}`)
+  log(`find ${opts.url}`)
 
-  return request({
+  let response = await request({
     method: 'GET',
     url: opts.url,
     json: false,
   })
-  .then((result) => $(result))
-  .then(($body) => {
 
-    let $article = $body.find('#article-area').find('script,style,textarea').remove().end()
+  let $body = $(response)
 
-    let body = ''
-    body = $article.html().trim()
-    body = he.decode(body)
+  let $article = $body.find('#article-area').find('script,style,textarea').remove().end()
 
-    let imgQ = imgDigger.dig(body)
-    let addressQ = addressDigger.dig(body)
+  let body = ''
+  body = $article.html().trim()
+  body = he.decode(body)
 
-    let datetime = datetimeDig($article)
+  let imgQ = imgDigger.dig(body)
+  let addressQ = addressDigger.dig(body)
 
-    let title = titleDig($article)
+  let published = datetimeDig($article)
 
-    return Promise
-    .all([imgQ, addressQ])
-    .then(([images, address]) => {
+  let title = titleDig($article)
 
-      images = images.map((img) => {
+  let [images, address] = await Promise.all([imgQ, addressQ])
 
-        if (img.url.indexOf('//') === 0) {
-          img.url = `http:${img.url}`
-        }
+  images = images.map((img) => {
 
-        return img.url
-      })
+    if (img.url.indexOf('//') === 0) {
+      img.url = `http:${img.url}`
+    }
 
-      return {
-        address,
-        body,
-        datetime,
-        images,
-        title,
-        url: opts.url,
-      }
-    })
+    return img.url
   })
+
+  return {
+    address,
+    body,
+    published,
+    images,
+    title,
+    url: opts.url,
+  }
 }
 
-function findAll(opts = {}) {
+async function findAll(opts = {}) {
+  let log = debug(`${logRoot.namespace}:findAll`)
+
   if (!opts.url || typeof opts.url !== 'string') {
     return Promise.reject('Need url, findAll({ url:String })')
   }
 
+  // 同時最多 N 條線
+  const THREADS_AT_SAME_TIME = 2
   const URL = opts.url
-  const MAX_PAGE = opts.maxPage || 1
+  const FETCH_ALL = (opts.fetchAll === true) ? true : false
+  let pageRanges = _.range(1, 2) // [1]
+  let articles = []
 
-  let maxPageDigged = crawlPages(URL).then((maxPage) => {
+  if (FETCH_ALL === true) {
+    let maxPageAmount = await crawlPages(URL)
 
-    let pageRange = 0
+    log(`部落格總共有 ${maxPageAmount} 頁，是否強制抓取全部頁面:${FETCH_ALL}`)
 
-    logFindAll(`部落格總共有 ${maxPage} 頁，設定最多抓 ${MAX_PAGE} 頁。`)
+    // [1,2,3,4,...N] 頁
+    pageRanges = _.range(1, maxPageAmount + 1)
+  }
 
-    if (maxPage >= MAX_PAGE) {
-      pageRange = MAX_PAGE
-    }
-    else {
-      pageRange = maxPage
-    }
+  log(`同時開了 ${THREADS_AT_SAME_TIME} 條連線，發動請求！`)
 
-    logFindAll(`現在開始抓取，到最多第 ${pageRange} 頁`)
+  if (NODE_ENV.match(/test/i)) {
+    log(`NODE_ENV:${NODE_ENV}，處理 pageRanges 變量，使它最多問三頁。`)
 
-    return pageRange
+    pageRanges = pageRanges.slice(0, 3)
+  }
+
+  // send requests
+  await async.eachLimit(pageRanges, THREADS_AT_SAME_TIME, async (page) => {
+    let blogUrl = `${URL}/${page}`
+    let crawled = await crawlList(blogUrl)
+    articles = articles.concat(crawled)
   })
 
-  .then((pageRange) => {
-
-    // 同時最多 N 條線
-    const THREADS_AT_SAME_TIME = 3
-
-    // 總共 [1,2,3,4,...N] 頁
-    let pageRanges = _.range(1, pageRange + 1)
-
-    logFindAll(`同時開了 ${THREADS_AT_SAME_TIME} 條連線，發動請求！`)
-
-    // send requests
-    return new Promise((ok, bad) => {
-
-      let list = []
-
-      async.eachLimit(pageRanges, THREADS_AT_SAME_TIME, (page, done) => {
-
-        let blogUrl = `${URL}/${page}`
-        let crawled = crawlList(blogUrl)
-
-        // concat requested lists
-        crawled
-        .then((result) => {
-          list = list.concat(result)
-          done()
-        }, done)
-
-      }, (err) => {
-        if (err) {
-          return bad(err)
-        }
-        else {
-          return ok(list)
-        }
-      })
-    })
-  })
-
-  return maxPageDigged
+  return articles
 }
 
+/**
+@param {string} url - Blogger blog's url that max page amount you want to know
+@returns {number} Max page amount
+*/
 function crawlPages(url) {
 
   return request({
@@ -141,9 +119,15 @@ function crawlPages(url) {
   .then(($body) => maxPageDig($body))
 }
 
+/**
+@param {string} url - Blogger blog's url
+@returns {object.<datetime, title, url>[]}
+*/
 function crawlList(url) {
 
-  logFindAll(`現在抓取清單，目標: ${url}`)
+  let log = debug(`${logRoot.namespace}:_crawlList`)
+
+  log(`現在抓取清單，目標: ${url}`)
   return request({
     method: 'GET',
     url: url,
@@ -153,11 +137,11 @@ function crawlList(url) {
   .then(($body) => {
     let $posts = $body.find('.article')
 
-    logFindAll(`找出有 ${$posts.length} 篇文章實例，開始解析各篇文章表面細節。`)
+    log(`找出有 ${$posts.length} 篇文章實例，開始解析各篇文章表面細節。`)
     let posts = _.map($posts, (articleElement) => {
       let $element = $(articleElement)
 
-      let datetime = datetimeDig($element)
+      let published = datetimeDig($element)
 
       let title = titleDig($element)
 
@@ -165,7 +149,7 @@ function crawlList(url) {
       let postUrl = $url.find('a').attr('href').trim()
 
       return {
-        datetime,
+        published,
         title,
         url: postUrl,
       }
@@ -202,9 +186,10 @@ function datetimeDig($element) {
   let time = $pub.find('.time').text().trim() // 13:12
 
   let datetime = new Date(`${month} ${date} ${year} ${time}`)
-  datetime = (datetime.toString().match(/invalid/i)) ? null : datetime.toISOString()
+  let isostring = datetime.toISOString()
+  isostring = (isISOString(isostring)) ? isostring : ''
 
-  return datetime
+  return isostring
 }
 
 function titleDig($element) {
