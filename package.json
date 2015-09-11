@@ -17,7 +17,7 @@
   "scripts": {
     "dev": "gulp babel && gulp watch",
     "build": "gulp babel",
-    "test": "NODE_ENV=test mocha --check-leaks --compilers js:babel-core/register"
+    "test": "DEBUG=pixnet-posts-crawler:* NODE_ENV=test mocha --check-leaks --compilers js:babel-core/register"
   },
   "author": "Pleasurazy <pleasurazy@gmail.com>",
   "license": "MIT",
