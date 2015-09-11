@@ -1,7 +1,7 @@
 import $ from 'cheerio'
 import _ from 'lodash'
 import addressDigger from 'html-taiwan-address-digger'
-import async from 'async'
+import async from 'async-q'
 import debug from 'debug'
 import he from 'he'
 import imgDigger from 'html-img-digger'
@@ -63,73 +63,43 @@ function find(opts = {}) {
   })
 }
 
-function findAll(opts = {}) {
+async function findAll(opts = {}) {
   if (!opts.url || typeof opts.url !== 'string') {
     return Promise.reject('Need url, findAll({ url:String })')
   }
 
+  // 同時最多 N 條線
+  const THREADS_AT_SAME_TIME = 2
   const URL = opts.url
-  const MAX_PAGE = opts.maxPage || 1
+  const FETCH_ALL = (opts.fetchAll === true) ? true : false
+  let pageRanges = _.range(1, 2) // [1]
+  let articles = []
 
-  let maxPageDigged = crawlPages(URL).then((maxPage) => {
+  if (FETCH_ALL === true) {
+    let maxPageAmount = await crawlPages(URL)
 
-    let pageRange = 0
+    logFindAll(`部落格總共有 ${maxPageAmount} 頁，是否強制抓取全部頁面:${FETCH_ALL}`)
 
-    logFindAll(`部落格總共有 ${maxPage} 頁，設定最多抓 ${MAX_PAGE} 頁。`)
+    // [1,2,3,4,...N] 頁
+    pageRanges = _.range(1, maxPageAmount + 1)
+  }
 
-    if (maxPage >= MAX_PAGE) {
-      pageRange = MAX_PAGE
-    }
-    else {
-      pageRange = maxPage
-    }
+  logFindAll(`同時開了 ${THREADS_AT_SAME_TIME} 條連線，發動請求！`)
 
-    logFindAll(`現在開始抓取，到最多第 ${pageRange} 頁`)
-
-    return pageRange
+  // send requests
+  await async.eachLimit(pageRanges, THREADS_AT_SAME_TIME, async (page) => {
+    let blogUrl = `${URL}/${page}`
+    let crawled = await crawlList(blogUrl)
+    articles = articles.concat(crawled)
   })
 
-  .then((pageRange) => {
-
-    // 同時最多 N 條線
-    const THREADS_AT_SAME_TIME = 3
-
-    // 總共 [1,2,3,4,...N] 頁
-    let pageRanges = _.range(1, pageRange + 1)
-
-    logFindAll(`同時開了 ${THREADS_AT_SAME_TIME} 條連線，發動請求！`)
-
-    // send requests
-    return new Promise((ok, bad) => {
-
-      let list = []
-
-      async.eachLimit(pageRanges, THREADS_AT_SAME_TIME, (page, done) => {
-
-        let blogUrl = `${URL}/${page}`
-        let crawled = crawlList(blogUrl)
-
-        // concat requested lists
-        crawled
-        .then((result) => {
-          list = list.concat(result)
-          done()
-        }, done)
-
-      }, (err) => {
-        if (err) {
-          return bad(err)
-        }
-        else {
-          return ok(list)
-        }
-      })
-    })
-  })
-
-  return maxPageDigged
+  return articles
 }
 
+/**
+@param {string} url - Blogger blog's url that max page amount you want to know
+@returns {number} Max page amount
+*/
 function crawlPages(url) {
 
   return request({
@@ -141,6 +111,10 @@ function crawlPages(url) {
   .then(($body) => maxPageDig($body))
 }
 
+/**
+@param {string} url - Blogger blog's url
+@returns {object.<datetime, title, url>[]}
+*/
 function crawlList(url) {
 
   logFindAll(`現在抓取清單，目標: ${url}`)
