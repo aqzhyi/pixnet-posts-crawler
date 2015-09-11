@@ -9,60 +9,58 @@ import request from 'request-promise'
 import isISOString from 'isostring'
 
 let logRoot = debug('pixnet-posts-crawler')
-let logFind = debug(`pixnet-posts-crawler:find`)
 const NODE_ENV = process.env.NODE_ENV || 'development'
 
-function find(opts = {}) {
+async function find(opts = {}) {
+
+  let log = debug(`${logRoot.namespace}:find`)
+
   if (!opts.url || typeof opts.url !== 'string') {
     return Promise.reject('Need url. API Documents => crawler.find({ url:String })')
   }
 
-  logFind(`來抓取 ${opts.url}`)
+  log(`find ${opts.url}`)
 
-  return request({
+  let response = await request({
     method: 'GET',
     url: opts.url,
     json: false,
   })
-  .then((result) => $(result))
-  .then(($body) => {
 
-    let $article = $body.find('#article-area').find('script,style,textarea').remove().end()
+  let $body = $(response)
 
-    let body = ''
-    body = $article.html().trim()
-    body = he.decode(body)
+  let $article = $body.find('#article-area').find('script,style,textarea').remove().end()
 
-    let imgQ = imgDigger.dig(body)
-    let addressQ = addressDigger.dig(body)
+  let body = ''
+  body = $article.html().trim()
+  body = he.decode(body)
 
-    let datetime = datetimeDig($article)
+  let imgQ = imgDigger.dig(body)
+  let addressQ = addressDigger.dig(body)
 
-    let title = titleDig($article)
+  let published = datetimeDig($article)
 
-    return Promise
-    .all([imgQ, addressQ])
-    .then(([images, address]) => {
+  let title = titleDig($article)
 
-      images = images.map((img) => {
+  let [images, address] = await Promise.all([imgQ, addressQ])
 
-        if (img.url.indexOf('//') === 0) {
-          img.url = `http:${img.url}`
-        }
+  images = images.map((img) => {
 
-        return img.url
-      })
+    if (img.url.indexOf('//') === 0) {
+      img.url = `http:${img.url}`
+    }
 
-      return {
-        address,
-        body,
-        datetime,
-        images,
-        title,
-        url: opts.url,
-      }
-    })
+    return img.url
   })
+
+  return {
+    address,
+    body,
+    published,
+    images,
+    title,
+    url: opts.url,
+  }
 }
 
 async function findAll(opts = {}) {

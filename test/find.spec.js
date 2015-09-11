@@ -30,6 +30,6 @@ describe('find()', function() {
     _.each(article.images, (img) => expect(isUrl(img)).to.equal(true, 'images 裡的物件必須是 url :string<URL>'))
 
     expect(article.address).to.be.an('array')
-    _.each(article.address, (addr) => expect(addr).to.equal(true, 'images 裡的物件必須是 地址 :string'))
+    _.each(article.address, (addr) => expect(addr).to.be.a('string', 'images 裡的物件必須是 地址 :string'))
   })
 })
