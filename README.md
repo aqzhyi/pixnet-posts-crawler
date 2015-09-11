@@ -7,8 +7,8 @@
 #### .findAll()
 
 ```
-@param {string} url
 @param {object} opts
+@param {string} opts.url - 部落格首頁網址，該網址必須包含分頁連結。
 @param {boolean} opts.fetchAll - 是否只取第一頁的文章。設為 true 則撈取全部分頁的文章清單。
 @returns {promise<Article[]>}
 ```
@@ -31,7 +31,8 @@ console.log(articles)
 #### .find()
 
 ```
-@param {string} url - 文章的 URL。
+@param {string} opts
+@param {string} opts.url - 文章的 URL。
 @returns {promise<Article>}
 ```
 
