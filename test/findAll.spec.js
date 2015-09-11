@@ -41,10 +41,10 @@ describe('findAll()', function() {
 
     _.each(articles, (item) => {
 
+      expect(item).to.include.keys('url', 'title', 'published')
       expect(isISOString(item.published)).to.equal(true, '必須要有 published')
       expect(isUrl(item.url)).to.equal(true, '必須要有 url')
       expect(item.title).to.be.a('string', '必須要有 title')
-      expect(item).to.include.keys('url', 'title', 'datetime')
     })
   })
 })

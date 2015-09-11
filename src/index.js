@@ -6,9 +6,11 @@ import debug from 'debug'
 import he from 'he'
 import imgDigger from 'html-img-digger'
 import request from 'request-promise'
+import isISOString from 'isostring'
 
+let logRoot = debug('pixnet-posts-crawler')
 let logFind = debug(`pixnet-posts-crawler:find`)
-let logFindAll = debug(`pixnet-posts-crawler:findAll`)
+const NODE_ENV = process.env.NODE_ENV || 'development'
 
 function find(opts = {}) {
   if (!opts.url || typeof opts.url !== 'string') {
@@ -64,6 +66,8 @@ function find(opts = {}) {
 }
 
 async function findAll(opts = {}) {
+  let log = debug(`${logRoot.namespace}:findAll`)
+
   if (!opts.url || typeof opts.url !== 'string') {
     return Promise.reject('Need url, findAll({ url:String })')
   }
@@ -78,13 +82,19 @@ async function findAll(opts = {}) {
   if (FETCH_ALL === true) {
     let maxPageAmount = await crawlPages(URL)
 
-    logFindAll(`部落格總共有 ${maxPageAmount} 頁，是否強制抓取全部頁面:${FETCH_ALL}`)
+    log(`部落格總共有 ${maxPageAmount} 頁，是否強制抓取全部頁面:${FETCH_ALL}`)
 
     // [1,2,3,4,...N] 頁
     pageRanges = _.range(1, maxPageAmount + 1)
   }
 
-  logFindAll(`同時開了 ${THREADS_AT_SAME_TIME} 條連線，發動請求！`)
+  log(`同時開了 ${THREADS_AT_SAME_TIME} 條連線，發動請求！`)
+
+  if (NODE_ENV.match(/test/i)) {
+    log(`NODE_ENV:${NODE_ENV}，處理 pageRanges 變量，使它最多問三頁。`)
+
+    pageRanges = pageRanges.slice(0, 3)
+  }
 
   // send requests
   await async.eachLimit(pageRanges, THREADS_AT_SAME_TIME, async (page) => {
@@ -117,7 +127,9 @@ function crawlPages(url) {
 */
 function crawlList(url) {
 
-  logFindAll(`現在抓取清單，目標: ${url}`)
+  let log = debug(`${logRoot.namespace}:_crawlList`)
+
+  log(`現在抓取清單，目標: ${url}`)
   return request({
     method: 'GET',
     url: url,
@@ -127,11 +139,11 @@ function crawlList(url) {
   .then(($body) => {
     let $posts = $body.find('.article')
 
-    logFindAll(`找出有 ${$posts.length} 篇文章實例，開始解析各篇文章表面細節。`)
+    log(`找出有 ${$posts.length} 篇文章實例，開始解析各篇文章表面細節。`)
     let posts = _.map($posts, (articleElement) => {
       let $element = $(articleElement)
 
-      let datetime = datetimeDig($element)
+      let published = datetimeDig($element)
 
       let title = titleDig($element)
 
@@ -139,7 +151,7 @@ function crawlList(url) {
       let postUrl = $url.find('a').attr('href').trim()
 
       return {
-        datetime,
+        published,
         title,
         url: postUrl,
       }
@@ -176,9 +188,10 @@ function datetimeDig($element) {
   let time = $pub.find('.time').text().trim() // 13:12
 
   let datetime = new Date(`${month} ${date} ${year} ${time}`)
-  datetime = (datetime.toString().match(/invalid/i)) ? null : datetime.toISOString()
+  let isostring = datetime.toISOString()
+  isostring = (isISOString(isostring)) ? isostring : ''
 
-  return datetime
+  return isostring
 }
 
 function titleDig($element) {
