@@ -37,6 +37,7 @@ async function find(opts = {}) {
 
   let imgQ = imgDigger.dig(body)
   let addressQ = addressDigger.dig(body)
+  let flickrImgs = await flickrDig($article)
 
   let published = datetimeDig($article)
 
@@ -52,6 +53,8 @@ async function find(opts = {}) {
 
     return img.url
   })
+
+  images = images.concat(flickrImgs)
 
   return {
     address,
@@ -198,6 +201,37 @@ function titleDig($element) {
   let title = $title.find('a').text().trim()
 
   return title
+}
+
+function flickrDig($element) {
+  let flickrPlayers = $element.find('iframe[src*="flickr"]')
+
+  let promises = Array.from(flickrPlayers).reduce((promises, element, index) => {
+    let promise = request({
+      method: 'GET',
+      url: $(element).attr('src'),
+      json: false,
+    })
+    .then((result) => {
+      let [context, match1] = result.match(/Y\.ContextData\.add\((.*?)\)/im) || []
+
+      if (match1) {
+        let photos = JSON.parse(match1)
+        return photos.photos[0].photo.sizes.l.url
+      }
+      else {
+        return null
+      }
+    })
+    .catch((err) => console.error(err))
+
+    promises.push(promise)
+    return promises
+  }, [])
+
+  // reject !item
+  return Promise.all(promises).then((result) => result.filter((item) => item))
+  .catch((err) => [])
 }
 
 export default {
